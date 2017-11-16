@@ -6,17 +6,8 @@ use std::io::prelude::*;
 fn main() {
     let mut xbee = Xbee::new("COM6").expect("Could not initialize Xbee");
 
-
-    let mut buf = String::new();
-
-    match xbee.write_raw("+++") {
-        Ok(size) => println!("Wrote {}", size),
-        Err(why) => println!("Error writing: {:?}", why),
-    }
-
-    buf = xbee.read_raw();
-
-    println!("Response: '{:?}'", buf);
+    xbee.write_raw("+++");
+    println!("{}", xbee.read_raw());
 
     loop {
         let mut cmd = String::new();
