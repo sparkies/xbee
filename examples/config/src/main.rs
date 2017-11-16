@@ -18,7 +18,7 @@ fn main() {
             .expect("Could not read line");
 
         if cmd != "+++" {
-            cmd += "\r".into();
+            cmd.push('\r');
         }
 
         xbee.write_raw(cmd);
