@@ -8,8 +8,17 @@ use std::time::Duration;
 fn main() {
     let mut xbee = Xbee::new("COM6").expect("Could not initialize Xbee");
 
-    xbee.write_raw("+++");
-    println!("{}", xbee.read_raw());
+    if let Err(why) = xbee.connect() {
+        println!("Could not enter command mode: {:?}", why);
+        return
+    }
+
+    xbee.edit_config(|ref mut c| {
+        c.set_id(0x6789)
+        .set_dh(0)
+        .set_dl(0)
+        .set_address(0);
+    });
 
     loop {
         let mut cmd = String::new();
