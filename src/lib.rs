@@ -152,26 +152,32 @@ impl Xbee {
             .map_err(Error::ParseIntError)
     }
 
-    pub fn edit_config<F: FnOnce(&mut XbeeConfig)>(&mut self, edit: F) {
+    pub fn edit_config<F>(&mut self, edit: F) -> Result<(), Error> 
+        where F: FnOnce(&mut XbeeConfig)
+    {
         let mut config = XbeeConfig::new();
 
         edit(&mut config);
 
         if let Some(id) = config.id {
-            self.set_id(id);
+            self.set_id(id)?;
         }
 
         if let Some(addr) = config.addr {
-            self.set_address(addr);
+            self.set_address(addr)?;
         }
 
         if let Some(dh) = config.dh {
-            self.set_dh(dh);
+            self.set_dh(dh)?;
         }
 
         if let Some(dl) = config.dl {
-            self.set_dl(dl);
+            self.set_dl(dl)?;
         }
+
+        self.write_raw("ATWR")?;
+        self.write_raw("ATAC")?;
+        Ok(())
     }
 }
 
