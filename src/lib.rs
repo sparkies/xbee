@@ -4,17 +4,19 @@ extern crate serial;
 use serial::prelude::*;
 
 use std::io::prelude::*;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use std::ffi::OsStr;
 
 #[derive(Debug)]
 pub enum Error {
     SerialError(serial::core::Error),
     IoError(std::io::Error),
+    ParseIntError(std::num::ParseIntError),
 }
 
 pub struct Xbee {
     port: serial::SystemPort,
+    last_time: Instant,
 }
 
 impl Xbee {
@@ -35,13 +37,22 @@ impl Xbee {
 
         Ok(Xbee {
             port: port,
+            last_time: Instant::now(),
         })
     }
 
     pub fn write_raw<T: Into<String>>(&mut self, data: T) -> Result<usize, Error> {
-        self.port
+        if self.last_time.elapsed().as_secs() > 8 {
+            self.connect();
+        }
+
+        let result = self.port
             .write(data.into().as_bytes())
-            .map_err(Error::IoError)
+            .map_err(Error::IoError);
+
+        self.last_time = Instant::now();
+
+        result
     }
 
     pub fn read_raw(&mut self) -> String {
@@ -60,5 +71,21 @@ impl Xbee {
         }
 
         output
+    }
+
+    pub fn connect(&mut self) -> Result<bool, Error> {
+        self.write_raw("+++")?;
+        let resp = self.read_raw();
+
+        Ok(resp == "OK\r")
+    }
+
+    pub fn id(&mut self) -> Result<u16, Error> {
+        self.write_raw("ATID\r")?;
+
+        let resp = self.read_raw();
+
+        u16::from_str_radix(&resp, 16)
+            .map_err(Error::ParseIntError)
     }
 }
