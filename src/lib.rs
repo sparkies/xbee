@@ -88,4 +88,127 @@ impl Xbee {
         u16::from_str_radix(&resp, 16)
             .map_err(Error::ParseIntError)
     }
+
+    pub fn set_id(&mut self, id: u16) -> Result<u16, Error> {
+        self.write_raw(format!("ATID{:x}\r", id))?;
+
+        let resp = self.read_raw();
+
+        u16::from_str_radix(&resp, 16)
+            .map_err(Error::ParseIntError)
+    }
+
+    pub fn address(&mut self) -> Result<u16, Error> {
+        self.write_raw("ATMY\r")?;
+
+        let resp = self.read_raw();
+
+        u16::from_str_radix(&resp, 16)
+            .map_err(Error::ParseIntError)
+    }
+
+    pub fn set_address(&mut self, addr: u16) -> Result<u16, Error> {
+        self.write_raw(format!("ATMY{:x}\r", addr))?;
+
+        let resp = self.read_raw();
+
+        u16::from_str_radix(&resp, 16)
+            .map_err(Error::ParseIntError)
+    }
+
+    pub fn dh(&mut self) -> Result<u16, Error> {
+        self.write_raw("ATDH\r")?;
+
+        let resp = self.read_raw();
+
+        u16::from_str_radix(&resp, 16)
+            .map_err(Error::ParseIntError)
+    }
+
+    pub fn set_dh(&mut self, dh: u16) -> Result<u16, Error> {
+        self.write_raw(format!("ATDH{:x}\r", dh))?;
+
+        let resp = self.read_raw();
+
+        u16::from_str_radix(&resp, 16)
+            .map_err(Error::ParseIntError)
+    }
+
+    pub fn dl(&mut self) -> Result<u16, Error> {
+        self.write_raw("ATDL\r")?;
+
+        let resp = self.read_raw();
+
+        u16::from_str_radix(&resp, 16)
+            .map_err(Error::ParseIntError)
+    }
+
+    pub fn set_dl(&mut self, dl: u16) -> Result<u16, Error> {
+        self.write_raw(format!("ATDL{:x}\r", dl))?;
+
+        let resp = self.read_raw();
+
+        u16::from_str_radix(&resp, 16)
+            .map_err(Error::ParseIntError)
+    }
+
+    pub fn edit_config<F: FnOnce(&mut XbeeConfig)>(&mut self, edit: F) {
+        let mut config = XbeeConfig::new();
+
+        edit(&mut config);
+
+        if let Some(id) = config.id {
+            self.set_id(id);
+        }
+
+        if let Some(addr) = config.addr {
+            self.set_address(addr);
+        }
+
+        if let Some(dh) = config.dh {
+            self.set_dh(dh);
+        }
+
+        if let Some(dl) = config.dl {
+            self.set_dl(dl);
+        }
+    }
+}
+
+pub struct XbeeConfig {
+    pub id: Option<u16>,
+    pub addr: Option<u16>,
+    pub dh: Option<u16>,
+    pub dl: Option<u16>,
+}
+
+impl XbeeConfig {
+    pub fn new() -> XbeeConfig {
+        XbeeConfig {
+            id: None,
+            addr: None,
+            dh: None,
+            dl: None,
+        }
+    }
+
+    pub fn set_id(&mut self, id: u16) -> &mut Self {
+        self.id = Some(id);
+        self
+    }
+
+    pub fn set_address(&mut self, addr: u16) -> &mut Self {
+        self.addr = Some(addr);
+        self
+    }
+
+    pub fn set_dh(&mut self, dh: u16) -> &mut Self {
+        self.dh = Some(dh);
+        self
+    }
+
+    pub fn set_dl(&mut self, dl: u16) -> &mut Self {
+        self.dl = Some(dl);
+        self
+    }
 }
