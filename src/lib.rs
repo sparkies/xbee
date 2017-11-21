@@ -1,4 +1,5 @@
 #![feature(io)]
+#[macro_use] extern crate log;
 extern crate serial;
 
 use serial::prelude::*;
@@ -42,13 +43,12 @@ impl Xbee {
     }
 
     pub fn write_raw<T: Into<String>>(&mut self, data: T) -> Result<usize, Error> {
-        if self.last_time.elapsed().as_secs() > 8 {
-            self.connect();
-        }
-
+        let s = data.into();
         let result = self.port
-            .write(data.into().as_bytes())
+            .write(s.as_bytes())
             .map_err(Error::IoError);
+
+        info!("Wrote '{}': {:?}", s.replace("\r", "\n"), result);
 
         self.last_time = Instant::now();
 
@@ -80,76 +80,72 @@ impl Xbee {
         Ok(resp == "OK\r")
     }
 
+    pub fn connected(&self) -> bool {
+        self.last_time.elapsed().as_secs() < 8
+    }
+
     pub fn id(&mut self) -> Result<u16, Error> {
         self.write_raw("ATID\r")?;
 
-        let resp = self.read_raw();
+        let mut resp = self.read_raw();
+        resp.pop();
 
         u16::from_str_radix(&resp, 16)
             .map_err(Error::ParseIntError)
     }
 
-    pub fn set_id(&mut self, id: u16) -> Result<u16, Error> {
+    pub fn set_id(&mut self, id: u16) -> Result<bool, Error> {
         self.write_raw(format!("ATID{:x}\r", id))?;
-
         let resp = self.read_raw();
-
-        u16::from_str_radix(&resp, 16)
-            .map_err(Error::ParseIntError)
+        Ok(resp == "OK\r")
     }
 
     pub fn address(&mut self) -> Result<u16, Error> {
         self.write_raw("ATMY\r")?;
 
-        let resp = self.read_raw();
+        let mut resp = self.read_raw();
+        resp.pop();
 
         u16::from_str_radix(&resp, 16)
             .map_err(Error::ParseIntError)
     }
 
-    pub fn set_address(&mut self, addr: u16) -> Result<u16, Error> {
+    pub fn set_address(&mut self, addr: u16) -> Result<bool, Error> {
         self.write_raw(format!("ATMY{:x}\r", addr))?;
-
         let resp = self.read_raw();
-
-        u16::from_str_radix(&resp, 16)
-            .map_err(Error::ParseIntError)
+        Ok(resp == "OK\r")
     }
 
     pub fn dh(&mut self) -> Result<u16, Error> {
         self.write_raw("ATDH\r")?;
 
-        let resp = self.read_raw();
+        let mut resp = self.read_raw();
+        resp.pop();
 
         u16::from_str_radix(&resp, 16)
             .map_err(Error::ParseIntError)
     }
 
-    pub fn set_dh(&mut self, dh: u16) -> Result<u16, Error> {
+    pub fn set_dh(&mut self, dh: u16) -> Result<bool, Error> {
         self.write_raw(format!("ATDH{:x}\r", dh))?;
-
         let resp = self.read_raw();
-
-        u16::from_str_radix(&resp, 16)
-            .map_err(Error::ParseIntError)
+        Ok(resp == "OK\r")
     }
 
     pub fn dl(&mut self) -> Result<u16, Error> {
         self.write_raw("ATDL\r")?;
 
-        let resp = self.read_raw();
+        let mut resp = self.read_raw();
+        resp.pop();
 
         u16::from_str_radix(&resp, 16)
             .map_err(Error::ParseIntError)
     }
 
-    pub fn set_dl(&mut self, dl: u16) -> Result<u16, Error> {
+    pub fn set_dl(&mut self, dl: u16) -> Result<bool, Error> {
         self.write_raw(format!("ATDL{:x}\r", dl))?;
-
         let resp = self.read_raw();
-
-        u16::from_str_radix(&resp, 16)
-            .map_err(Error::ParseIntError)
+        Ok(resp == "OK\r")
     }
 
     pub fn edit_config<F>(&mut self, edit: F) -> Result<(), Error> 
