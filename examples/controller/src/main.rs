@@ -3,6 +3,7 @@ extern crate xbee;
 
 use xbee::*;
 use std::io::prelude::*;
+use std::error::Error;
 use serialport::SerialPortType;
 
 fn main() {
@@ -14,39 +15,80 @@ fn main() {
         }
     };
 
-    println!("Selected {}", port_name);
-
-    let mut xbee = Xbee::new(&port_name).expect("Could not initialize Xbee");
+    let mut xbee = match Xbee::new(&port_name) {
+        Ok(xbee) => xbee,
+        Err(why) => {
+            match why {
+                xbee::Error::SerialError(err) => {
+                    println!("Serial error: {}", err.description());
+                }
+                _ => println!("Other"),
+            }
+            return
+        }
+    };
 
     loop {
-        let mut cmd = String::new();
+        println!("\nChoose a command:");
+        println!("1. Set threshhold");
+        println!("2. Get data");
+        println!("3. Exit\n");
+
+        let mut input = String::new();
         let stdin = std::io::stdin();
 
         stdin.lock()
-            .read_line(&mut cmd)
+            .read_line(&mut input)
             .expect("Could not read line");
 
-        cmd = cmd.trim().into();
-        
-        if cmd == "+++" {
-            if let Err(why) = xbee.connect() {
-                println!("Could not enter command mode: {:?}", why);
-                return
-            }
-            else {
-                println!("Entered command mode.");
-            }
-        } 
-        else {
-            match &*cmd {
-                "ATID" => println!("{:?}", xbee.id()),
-                "ATDL" => println!("{:?}", xbee.dl()),
-                "ATDH" => println!("{:?}", xbee.dh()),
-                "ATMY" => println!("{:?}", xbee.address()),
-                _ => {
-                    xbee.write_raw(cmd);
+        input = input.trim().into();
+
+        if input == "1" {
+            let mut value = String::new();
+
+            loop {
+                print!("Enter new threshhold: ");
+                let _ = std::io::stdout().flush();
+
+                stdin.lock()
+                    .read_line(&mut value)
+                    .expect("Could not read line");
+
+                value = value.trim().into();
+
+                if let Ok(_) = value.parse::<u32>() {
+                    break;
                 }
             }
+
+            if let Err(why) = xbee.write_raw(format!("set {}", value)) {
+                println!("Could not send set request: {:?}", why);
+            }
+        } 
+        else if input == "2" {
+            if let Err(why) = xbee.write_raw("get") {
+                println!("Could not send get request: {:?}", why);
+                continue;
+            }
+
+            let resp = xbee.read_raw();
+
+            let values = resp
+                .split_whitespace()
+                .filter_map(|v| v.parse::<f64>().ok())
+                .collect::<Vec<f64>>();
+
+            if values.len() < 3 {
+                println!("Could not get data.");
+            } else {
+                println!("Temperature: {}°C", values[0]);
+                println!("Humidity   : {}%", values[1]);
+                println!("Threshhold : {}", values[2]);
+            }
+        } else if input == "3" {
+            break;
+        } else {
+            println!("Invalid selection: {}", input);
         }
     }
 }
