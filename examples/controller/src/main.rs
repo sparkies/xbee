@@ -1,5 +1,3 @@
-#[macro_use] extern crate log;
-extern crate env_logger;
 extern crate serialport;
 extern crate xbee;
 
@@ -8,8 +6,6 @@ use std::io::prelude::*;
 use serialport::SerialPortType;
 
 fn main() {
-    env_logger::init();
-
     let port_name = match select_port() {
         Some(name) => name,
         None => {
