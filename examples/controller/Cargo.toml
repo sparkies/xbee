@@ -6,7 +6,11 @@ authors = ["Maid Dog <maiddogsrl@gmail.com>"]
 [dependencies]
 log = "0.3"
 env_logger = "0.4"
-serial_enumerate = "0.1"
+parking_lot = "0.5"
+
+[dependencies.serialport]
+git = "https://gitlab.com/susurrus/serialport-rs"
+rev = "63b36a2b"
 
 [dependencies.xbee]
 path = "../.."

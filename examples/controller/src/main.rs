@@ -1,10 +1,11 @@
 #[macro_use] extern crate log;
 extern crate env_logger;
-extern crate serial_enumerate;
+extern crate serialport;
 extern crate xbee;
 
 use xbee::*;
 use std::io::prelude::*;
+use serialport::SerialPortType;
 
 fn main() {
     env_logger::init();
@@ -47,7 +48,7 @@ fn main() {
                 "ATDH" => println!("{:?}", xbee.dh()),
                 "ATMY" => println!("{:?}", xbee.address()),
                 _ => {
-                    xbee.send(cmd);
+                    xbee.write_raw(cmd);
                 }
             }
         }
@@ -55,7 +56,7 @@ fn main() {
 }
 
 fn select_port() -> Option<String> {
-    let ports = match serial_enumerate::enumerate_serial_ports() {
+    let ports = match serialport::available_ports() {
         Ok(ports) => ports,
         Err(why) => {
             println!("Could not enumerate serial ports: {:?}", why);
@@ -71,8 +72,10 @@ fn select_port() -> Option<String> {
     loop {
         println!("Select a port to connect to:");
 
-        for (index, device) in ports.iter().enumerate() {
-            println!("{}: {}", index, device);
+        for (index, port) in ports.iter().enumerate() {
+            if let SerialPortType::UsbPort(ref info) = port.port_type {
+                println!("{}: {} - {}", index + 1, port.port_name, info.product.as_ref().map_or("", String::as_str));
+            }
         }
 
         let stdin = std::io::stdin();
@@ -85,8 +88,10 @@ fn select_port() -> Option<String> {
         let trimmed = input.trim();
 
         match trimmed.parse::<usize>() {
-            Ok(num) => return Some(ports.get(num).unwrap().clone()),
-            Err(why) => println!("Invalid selection."),
+            Ok(num) if num > 0 && num <= ports.len() => {
+                return Some(ports.get(num - 1).unwrap().port_name.clone())
+            }
+            _ => println!("Invalid selection."),
         }
     }
 }
