@@ -4,6 +4,8 @@ extern crate xbee;
 use xbee::*;
 use std::io::prelude::*;
 use std::error::Error;
+use std::thread;
+use std::time::Duration;
 use serialport::SerialPortType;
 
 fn main() {
@@ -30,7 +32,7 @@ fn main() {
 
     loop {
         println!("\nChoose a command:");
-        println!("1. Set threshhold");
+        println!("1. Set threshold");
         println!("2. Get data");
         println!("3. Exit\n");
 
@@ -47,7 +49,7 @@ fn main() {
             let mut value = String::new();
 
             loop {
-                print!("Enter new threshhold: ");
+                print!("Enter new threshold: ");
                 let _ = std::io::stdout().flush();
 
                 stdin.lock()
@@ -61,29 +63,60 @@ fn main() {
                 }
             }
 
-            if let Err(why) = xbee.write_raw(format!("set {}", value)) {
-                println!("Could not send set request: {:?}", why);
+            let mut tries = 0;
+
+            loop {
+                if tries >= 10 {
+                    println!("Could not set after 10 tries.");
+                    break;
+                }
+
+                if let Err(why) = xbee.write_raw(format!("set {}", value)) {
+                    println!("Could not send set request: {:?}", why);
+                }
+
+                let mut resp = xbee.read_raw();
+                resp = resp.trim().into();
+                
+                if resp == "OK" {
+                    println!("New threshold set to {}", value);
+                    break;
+                } else {
+                    tries += 1;
+                }
+
+                thread::sleep(Duration::from_millis(100));
             }
         } 
         else if input == "2" {
-            if let Err(why) = xbee.write_raw("get") {
-                println!("Could not send get request: {:?}", why);
-                continue;
-            }
+            let mut tries = 0;
+            loop {
+                if tries >= 10 {
+                    println!("Could not get data after 10 tries.");
+                    break;
+                }
 
-            let resp = xbee.read_raw();
+                if let Err(why) = xbee.write_raw("get") {
+                    println!("Could not send get request: {:?}", why);
+                    continue;
+                }
 
-            let values = resp
-                .split_whitespace()
-                .filter_map(|v| v.parse::<f64>().ok())
-                .collect::<Vec<f64>>();
+                let resp = xbee.read_raw();
 
-            if values.len() < 3 {
-                println!("Could not get data.");
-            } else {
-                println!("Temperature: {}°C", values[0]);
-                println!("Humidity   : {}%", values[1]);
-                println!("Threshhold : {}", values[2]);
+                let values = resp
+                    .split_whitespace()
+                    .filter_map(|v| v.parse::<f64>().ok())
+                    .collect::<Vec<f64>>();
+
+                if values.len() < 3 {
+                    tries += 1;
+                } else {
+                    println!("Temperature: {}°C", values[0]);
+                    println!("Humidity   : {}%", values[1]);
+                    println!("Threshold : {}", values[2]);
+                    break;
+                }
+                thread::sleep(Duration::from_millis(100));
             }
         } else if input == "3" {
             break;
