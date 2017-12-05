@@ -3,6 +3,9 @@ name = "controller"
 version = "0.1.0"
 authors = ["Maid Dog <maiddogsrl@gmail.com>"]
 
+[dependencies]
+pancurses = "0.11"
+
 [dependencies.serialport]
 git = "https://gitlab.com/susurrus/serialport-rs"
 rev = "63b36a2b"
