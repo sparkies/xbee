@@ -4,5 +4,9 @@ version = "0.1.0"
 authors = ["Maid Dog <maiddogsrl@gmail.com>"]
 
 [dependencies]
+byteorder = "1.2"
+failure = "0.1"
+lazy_static = "1.0.0"
+parking_lot = "0.5"
 serial = "0.4"
 log = "0.3"
