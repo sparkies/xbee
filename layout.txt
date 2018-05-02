@@ -1,0 +1,24 @@
+Workflow:
+    User should be able to plugin the device to set it up.
+    Setup should include the following:
+        Setting the device name
+        (Re-)generating a UUID
+        Setting the AES key (Setting a password)
+        Setting the operating voltage values for the sensor
+        Setting up modifiable pins (for remote access)
+    Once setup, the device should be able to be plugged in and connect automatically.
+
+
+For Network: (Do we need Sender?)
+    +---------------------+---------------------+
+    |  Origin  (4 bytes)  |   Dest  (4 bytes)   |
+    +---------------------+---------------------+
+    |  Sender  (4 bytes)  | Packet ID (4 bytes) |
+    +---------------------+---------------------+
+    |               Data (n bytes)              |
+    +-------------------------------------------+
+1. Origin sends packet with its values
+2. Node receives packet
+    If node id == dest id, then consume
+    Else rebroadcast with node id as sender id
+    

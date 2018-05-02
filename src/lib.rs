@@ -21,7 +21,7 @@ pub struct Xbee {
 }
 
 impl Xbee {
-    pub fn new(port: &str) -> Result<Xbee, Error> {
+    pub fn new<T: AsRef<OsStr> + ?Sized>(port: &T) -> Result<Xbee, Error> {
         let mut port = serial::open(port)?;
 
         port.reconfigure(&|settings| {

@@ -87,6 +87,14 @@ fn main() {
 
                 thread::sleep(Duration::from_millis(100));
             }
+
+            let resp = xbee.read_raw();
+
+            if resp != "OK\r\n" {
+                println!("Did not get response. {}", resp);
+            } else {
+                println!("Threshold set to {}", value);
+            }
         } 
         else if input == "2" {
             let mut tries = 0;

@@ -1,11 +1,15 @@
 [package]
-name = "config"
+name = "demo"
 version = "0.1.0"
 authors = ["Maid Dog <maiddogsrl@gmail.com>"]
 
-[dependencies.xbee]
-path = "../.."
+[dependencies]
+byteorder = "1.2"
+failure = "0.1"
 
 [dependencies.serialport]
 git = "https://gitlab.com/susurrus/serialport-rs"
 rev = "63b36a2b"
+
+[dependencies.xbee]
+path = "../.."
