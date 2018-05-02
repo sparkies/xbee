@@ -8,6 +8,7 @@ extern crate serial;
 use failure::Error;
 use serial::prelude::*;
 
+use std::ffi::OsStr;
 use std::io::prelude::*;
 use std::time::{Duration, Instant};
 
@@ -66,23 +67,29 @@ impl Xbee {
         let mut data = Vec::new();
         let mut length = 0;
         let mut tries = 0;
-        let mut started = false;
+        let mut started = 0;
         
         loop {
-            if !started {
+            if started <= 1 {
                 let mut startbyte = [0; 1];
 
                 if self.port.read_exact(&mut startbyte).is_ok() {
-                    started = true;
+                    if started == 0 && startbyte[0] == 0xA3 {
+                        started += 1;
+                    } else if started == 1 && startbyte[0] == 0xFF {
+                        started += 1;
+                    } else {
+                        started = 0;
+                    }
                 }
             } else {
                 if let Ok(amount) = self.port.read(&mut buffer[..]) {
                     data.extend_from_slice(&buffer[..amount]);
                 }
 
-                if length == 0 && data.len() >= 13 {
-                    length = data[12] as usize;
-                } else if length > 0 && data.len() >= 13 + length {
+                if length == 0 && data.len() >= 15 {
+                    length = data[14] as usize;
+                } else if length > 0 && data.len() >= 15 + length {
                     return Packet::from_data(&data);
                 }
             }
