@@ -1,19 +1,19 @@
 #![feature(io)]
-#[macro_use] extern crate log;
+extern crate byteorder;
+#[macro_use] extern crate failure;
+#[macro_use] extern crate lazy_static;
+extern crate parking_lot;
 extern crate serial;
 
+use failure::Error;
 use serial::prelude::*;
 
 use std::io::prelude::*;
 use std::time::{Duration, Instant};
-use std::ffi::OsStr;
 
-#[derive(Debug)]
-pub enum Error {
-    SerialError(serial::core::Error),
-    IoError(std::io::Error),
-    ParseIntError(std::num::ParseIntError),
-}
+pub mod packet;
+
+use packet::*;
 
 pub struct Xbee {
     port: serial::SystemPort,
@@ -21,8 +21,8 @@ pub struct Xbee {
 }
 
 impl Xbee {
-    pub fn new<T: AsRef<OsStr> + ?Sized>(port: &T) -> Result<Xbee, Error> {
-        let mut port = serial::open(port).map_err(Error::SerialError)?;
+    pub fn new(port: &str) -> Result<Xbee, Error> {
+        let mut port = serial::open(port)?;
 
         port.reconfigure(&|settings| {
             settings.set_baud_rate(serial::Baud9600)?;
@@ -31,10 +31,9 @@ impl Xbee {
             settings.set_stop_bits(serial::Stop1);
             settings.set_flow_control(serial::FlowNone);
             Ok(())
-        }).map_err(Error::SerialError)?;
+        })?;
 
-        port.set_timeout(Duration::from_millis(10))
-            .map_err(Error::SerialError)?;
+        port.set_timeout(Duration::from_millis(10))?;
 
         Ok(Xbee {
             port: port,
@@ -42,17 +41,10 @@ impl Xbee {
         })
     }
 
-    pub fn write_raw<T: Into<String>>(&mut self, data: T) -> Result<usize, Error> {
-        let s = data.into();
-        let result = self.port
-            .write(s.as_bytes())
-            .map_err(Error::IoError);
-
-        info!("Wrote '{}': {:?}", s.replace("\r", "\n"), result);
-
+    pub fn write_raw(&mut self, data: &[u8]) -> Result<usize, Error> {
+        let result = self.port.write(data)?;
         self.last_time = Instant::now();
-
-        result
+        Ok(result)
     }
 
     pub fn read_raw(&mut self) -> String {
@@ -64,17 +56,50 @@ impl Xbee {
             if let Ok(amount) = self.port.read(&mut data[..]) {
                 output += std::str::from_utf8(&data[0..amount]).unwrap_or("");
             }
-
-            if output.contains('\r') {
-                break;
-            }
         }
 
         output
     }
 
+    pub fn read_packet(&mut self) -> Result<Packet, Error> {
+        let mut buffer = [0; 1024];
+        let mut data = Vec::new();
+        let mut length = 0;
+        let mut tries = 0;
+        let mut started = false;
+        
+        loop {
+            if !started {
+                let mut startbyte = [0; 1];
+
+                if self.port.read_exact(&mut startbyte).is_ok() {
+                    started = true;
+                }
+            } else {
+                if let Ok(amount) = self.port.read(&mut buffer[..]) {
+                    data.extend_from_slice(&buffer[..amount]);
+                }
+
+                if length == 0 && data.len() >= 13 {
+                    length = data[12] as usize;
+                } else if length > 0 && data.len() >= 13 + length {
+                    return Packet::from_data(&data);
+                }
+            }
+
+            ensure!(tries < 1000, PacketError::Timeout);
+            tries += 1;
+        }
+    }
+
+    pub fn send_packet(&mut self, dest: u32, data: &[u8]) -> Result<usize, Error> {
+        let packet = Packet::new(dest, data);
+
+        self.write_raw(&packet.as_bytes())
+    }
+
     pub fn connect(&mut self) -> Result<bool, Error> {
-        self.write_raw("+++")?;
+        self.write_raw(b"+++")?;
         let resp = self.read_raw();
 
         Ok(resp == "OK\r")
@@ -85,65 +110,65 @@ impl Xbee {
     }
 
     pub fn id(&mut self) -> Result<u16, Error> {
-        self.write_raw("ATID\r")?;
+        self.write_raw(b"ATID\r")?;
 
         let mut resp = self.read_raw();
         resp.pop();
 
-        u16::from_str_radix(&resp, 16)
-            .map_err(Error::ParseIntError)
+        let val = u16::from_str_radix(&resp, 16)?;
+        Ok(val)
     }
 
     pub fn set_id(&mut self, id: u16) -> Result<bool, Error> {
-        self.write_raw(format!("ATID{:x}\r", id))?;
+        self.write_raw(format!("ATID{:x}\r", id).as_bytes())?;
         let resp = self.read_raw();
         Ok(resp == "OK\r")
     }
 
     pub fn address(&mut self) -> Result<u16, Error> {
-        self.write_raw("ATMY\r")?;
+        self.write_raw(b"ATMY\r")?;
 
         let mut resp = self.read_raw();
         resp.pop();
 
-        u16::from_str_radix(&resp, 16)
-            .map_err(Error::ParseIntError)
+        let val = u16::from_str_radix(&resp, 16)?;
+        Ok(val)
     }
 
     pub fn set_address(&mut self, addr: u16) -> Result<bool, Error> {
-        self.write_raw(format!("ATMY{:x}\r", addr))?;
+        self.write_raw(format!("ATMY{:x}\r", addr).as_bytes())?;
         let resp = self.read_raw();
         Ok(resp == "OK\r")
     }
 
     pub fn dh(&mut self) -> Result<u16, Error> {
-        self.write_raw("ATDH\r")?;
+        self.write_raw(b"ATDH\r")?;
 
         let mut resp = self.read_raw();
         resp.pop();
 
-        u16::from_str_radix(&resp, 16)
-            .map_err(Error::ParseIntError)
+        let val = u16::from_str_radix(&resp, 16)?;
+        Ok(val)
     }
 
     pub fn set_dh(&mut self, dh: u16) -> Result<bool, Error> {
-        self.write_raw(format!("ATDH{:x}\r", dh))?;
+        self.write_raw(format!("ATDH{:x}\r", dh).as_bytes())?;
         let resp = self.read_raw();
         Ok(resp == "OK\r")
     }
 
     pub fn dl(&mut self) -> Result<u16, Error> {
-        self.write_raw("ATDL\r")?;
+        self.write_raw(b"ATDL\r")?;
 
         let mut resp = self.read_raw();
         resp.pop();
 
-        u16::from_str_radix(&resp, 16)
-            .map_err(Error::ParseIntError)
+        let val = u16::from_str_radix(&resp, 16)?;
+        Ok(val)
     }
 
     pub fn set_dl(&mut self, dl: u16) -> Result<bool, Error> {
-        self.write_raw(format!("ATDL{:x}\r", dl))?;
+        self.write_raw(format!("ATDL{:x}\r", dl).as_bytes())?;
         let resp = self.read_raw();
         Ok(resp == "OK\r")
     }
@@ -171,8 +196,8 @@ impl Xbee {
             self.set_dl(dl)?;
         }
 
-        self.write_raw("ATWR")?;
-        self.write_raw("ATAC")?;
+        self.write_raw(b"ATWR")?;
+        self.write_raw(b"ATAC")?;
         Ok(())
     }
 }
